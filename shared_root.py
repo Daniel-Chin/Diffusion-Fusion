@@ -1,7 +1,17 @@
 import os
 from os import path
+from socket import socket
 
 import torch
+
+PORT = 2351
+sock = socket()
+try:
+    sock.bind(('localhost', PORT))
+except OSError:
+    is_first = False
+else:
+    is_first = True
 
 HAS_CUDA = torch.cuda.is_available()
 CUDA = torch.device("cuda:0")
@@ -9,16 +19,13 @@ CPU  = torch.device("cpu")
 if HAS_CUDA:
     DEVICE = CUDA
     DEVICE_STR = 'cuda'
-    print('We have CUDA.')
-    # gpu_name = torch.cuda.get_device_name(
-    #     torch.cuda.current_device(), 
-    # )
-    # with open('gpu_name.txt', 'w') as f:
-    #     print(gpu_name, file=f)
+    if is_first:
+        print('We have CUDA.')
 else:
     DEVICE = CPU
     DEVICE_STR = 'cpu'
-    print("We DON'T have CUDA.")
+    if is_first:
+        print("We DON'T have CUDA.")
 
 if __name__ == '__main__':
     SHARED_ROOT = 'shared_root.py'
