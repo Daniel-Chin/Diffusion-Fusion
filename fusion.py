@@ -15,7 +15,7 @@ from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
 from diffusers import LMSDiscreteScheduler
 import torch
 import numpy as np
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from matplotlib import pyplot as plt
 from winsound import Beep
 logging.set_verbosity_error()
@@ -90,7 +90,7 @@ def forward():
     latents = torch.cat([latents] * LADDER_LEN)
 
     with torch.autocast(DEVICE_STR) if (
-        HAS_CUDA or torch.__version__ > '1.10.0'
+        HAS_CUDA or torch.__version__ > '1.12.2'
     ) else nullcontext():
         for i, t in tqdm([*enumerate(scheduler.timesteps)], 'denoising'):
             latents = oneStep(
@@ -169,7 +169,8 @@ def oneStep(
     )
     # gn = nn - noise_pred_uncond
     # noise_pred = noise_pred_uncond + (g0 + g1 - gn) * guidance_scale
-    g = g0 + g1
+    envelope = LADDER.view(LADDER_LEN, 1, 1, 1)
+    g = g0 * (1 - envelope) + g1 * envelope
     my_scale = max(g0.norm(), g1.norm()) / g.norm()
     noise_pred = (
         noise_pred[0 * LADDER_LEN : 1 * LADDER_LEN] 
@@ -185,5 +186,5 @@ def oneStep(
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 with torch.no_grad():
-    # forward()
+    forward()
     visualize()
