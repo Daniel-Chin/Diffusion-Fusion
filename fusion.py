@@ -2,7 +2,9 @@
 Subtracting horse seems useful!?!?
 pixel-level constraints
     symmetry
+        symmetric dog
     横看成岭侧成峰
+        computer + music
 '''
 
 from contextlib import nullcontext
@@ -95,16 +97,22 @@ def main():
                 uncond_embeddings, text_embeddings_pair,  
             )
 
+    print('Saving...')
+    with open('latents.tensor', 'wb') as f:
+        torch.save(latents, f)
+    
     print('Decoding image...')
     latents = 1 / 0.18215 * latents
+
     fusion_images = toImg(vae.decode(latents).sample)
     interp_images = torch.zeros_like(fusion_images)
-    for i, k in enumerate(LADDER):
+    for i, k in tqdm([*enumerate(LADDER)]):
         interp_images[i, :, :, :] = toImg(vae.decode(
             latents[0,  :, :, :] * (1 - k) +
             latents[-1, :, :, :] * k
         ).sample)
 
+    print('plotting...')
     fig, axes = plt.subplots(2, LADDER_LEN)
     for row_i, method_name in enumerate(('fusion', 'interp')):
         axes[row_i][LADDER_LEN // 2].set_title(method_name)
@@ -121,6 +129,7 @@ def toImg(x: torch.Tensor):
     x = (x / 2 + 0.5).clamp(0, 1)
     x = x.cpu().permute(0, 2, 3, 1).numpy()
     x = (x * 255).round().astype("uint8")
+    return x
 
 def oneStep(
     i, t, latents, guidance_scale, 

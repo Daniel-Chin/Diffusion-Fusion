@@ -1,3 +1,4 @@
 *.pyc
 *.png
 *shared.py
+*.tensor
