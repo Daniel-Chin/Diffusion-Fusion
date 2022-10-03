@@ -14,6 +14,7 @@ from transformers import logging
 from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
 from diffusers import LMSDiscreteScheduler
 import torch
+import numpy as np
 from tqdm.auto import tqdm
 from matplotlib import pyplot as plt
 from winsound import Beep
@@ -49,7 +50,7 @@ unet = UNet2DConditionModel.from_pretrained(
 ).to(DEVICE)
 print('Loaded models.')
 
-def main():
+def forward():
     prompt_pair = [
         "a photo of a person doing a handstand on a horse", 
         "a photo of an astronaut riding a horse on mars", 
@@ -101,16 +102,22 @@ def main():
     with open('latents.tensor', 'wb') as f:
         torch.save(latents, f)
     
-    print('Decoding image...')
+def visualize():
+    with open('latents.tensor', 'rb') as f:
+        latents = torch.load(f)
+    
     latents = 1 / 0.18215 * latents
 
+    print('Decoding fusion image...')
     fusion_images = toImg(vae.decode(latents).sample)
-    interp_images = torch.zeros_like(fusion_images)
-    for i, k in tqdm([*enumerate(LADDER)]):
-        interp_images[i, :, :, :] = toImg(vae.decode(
+
+    print('Decoding interpolation image...')
+    for i, k in enumerate(LADDER):
+        latents[i, :, :, :] = (
             latents[0,  :, :, :] * (1 - k) +
             latents[-1, :, :, :] * k
-        ).sample)
+        )
+    interp_images = toImg(vae.decode(latents).sample)
 
     print('plotting...')
     fig, axes = plt.subplots(2, LADDER_LEN)
@@ -120,7 +127,6 @@ def main():
             ax = axes[row_i][col_i]
             img = locals()[method_name + '_images'][col_i, :, :, :]
             ax.imshow(img)
-    Beep(330, 2)
     plt.show()
     from console import console
     console({**globals(), **locals()})
@@ -179,4 +185,5 @@ def oneStep(
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 with torch.no_grad():
-    main()
+    # forward()
+    visualize()
