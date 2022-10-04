@@ -15,14 +15,24 @@ from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
 from diffusers import LMSDiscreteScheduler
 import torch
 from tqdm import tqdm
+import matplotlib
 from matplotlib import pyplot as plt
 from winsound import Beep
 logging.set_verbosity_error()
 
 from shared import *
 
+PROMPT_PAIR = [
+    "a photo of a person doing a handstand on a horse", 
+    "a photo of an astronaut riding a horse on mars", 
+    # # "a photo of a horse", 
+
+    # 'a photo of spaceships firing in star wars', 
+    # 'a photo of a motorbike racing in dense jungles', 
+]
 LADDER_LEN = 9
 LADDER = torch.linspace(0, 1, LADDER_LEN)
+WIDTH, HEIGHT = 512, 512
 
 generator = torch.Generator(DEVICE_STR).manual_seed(23330)
 tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
@@ -50,24 +60,15 @@ unet = UNet2DConditionModel.from_pretrained(
 print('Loaded models.')
 
 def forward():
-    prompt_pair = [
-        # "a photo of a person doing a handstand on a horse", 
-        # "a photo of an astronaut riding a horse on mars", 
-        # # "a photo of a horse", 
-
-        'a photo of spaceships firing in star wars', 
-        'a photo of a motorbike racing in dense jungles', 
-    ]
     num_inference_steps = 20
     guidance_scale = 7.5
-    width, height = 512, 512
     
     print('Encoding text...')
     text_input_pair = [tokenizer(
         x, padding="max_length", 
         max_length=tokenizer.model_max_length, 
         truncation=True, return_tensors="pt", 
-    ) for x in prompt_pair]
+    ) for x in PROMPT_PAIR]
     text_embeddings_pair = [text_encoder(
         x.input_ids.to(DEVICE), 
     )[0] for x in text_input_pair]
@@ -83,7 +84,7 @@ def forward():
 
     print('Sampling latent...')
     latents = torch.randn((
-        1, unet.in_channels, height // 8, width // 8,
+        1, unet.in_channels, HEIGHT // 8, WIDTH // 8,
     ), generator=generator)
     latents = latents.to(DEVICE)
     scheduler.set_timesteps(num_inference_steps)
@@ -123,16 +124,48 @@ def visualize():
     interp_images = toImg(vae.decode(latents).sample)
 
     print('plotting...')
-    fig, axes = plt.subplots(2, LADDER_LEN)
-    for row_i, method_name in enumerate(('fusion', 'interp')):
-        axes[row_i][LADDER_LEN // 2].set_title(method_name)
+    DPI = 300
+    matplotlib.rcParams['figure.dpi'] = DPI
+    matplotlib.rcParams['font.size'] = 16
+    fig = plt.figure(figsize=(
+        WIDTH * LADDER_LEN * 1.1 / DPI, 
+        HEIGHT * 2 * 2 / DPI, 
+    ))
+    axes = fig.subplots(2, LADDER_LEN)
+    for row_i, (images, display) in enumerate((
+        (fusion_images, 'Diffusion Fusion'), 
+        (interp_images, 'Latent Interpolation'), 
+    )):
+        axes[row_i][LADDER_LEN // 2].set_title(display)
         for col_i in range(LADDER_LEN):
             ax = axes[row_i][col_i]
-            img = locals()[method_name + '_images'][col_i, :, :, :]
+            img = images[col_i, :, :, :]
             ax.imshow(img)
-    plt.show()
+            ax.axis('off')
+    for i, j, ha in ((0, 0, 'left'), (-1, 1, 'right')):
+        axes[0][i].set_title(
+            smartLineBreak(PROMPT_PAIR[j]), 
+            ha=ha
+        )
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=.02)
+    plt.savefig('out.png', dpi=DPI)
+    # plt.show()
     from console import console
     console({**globals(), **locals()})
+
+def smartLineBreak(x, line_width=20):
+    buffer = []
+    words = x.split(' ')
+    acc = 0
+    for word in words:
+        acc += len(word) + 1
+        if acc > line_width:
+            buffer.append('\n')
+            acc = len(word) + 1
+        buffer.append(word)
+        buffer.append(' ')
+    return ''.join(buffer[:-1])
 
 def toImg(x: torch.Tensor):
     x = (x / 2 + 0.5).clamp(0, 1)
@@ -198,5 +231,5 @@ def oneStep(
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 with torch.no_grad():
-    forward()
+    # forward()
     visualize()
