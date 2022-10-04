@@ -23,7 +23,7 @@ from shared import *
 
 PROMPT = 'a photo of a symmetric bottle on kitchen table'
 WIDTH, HEIGHT = 512, 512
-num_inference_steps = 50
+num_inference_steps = 15
 guidance_scale = 7.5
 N_EXP = 1
 LATENT_FILE = 'latents_constrained_diff.tensor'
@@ -153,7 +153,7 @@ def oneStep(
     text_embeddings,  
 ):
     print('constrain...')
-    latents = constrain(latents, i, True, False)
+    latents = constrain(latents, i, True, True, .5)
 
     # print('expanding...')
     latents_expand = torch.cat([latents] * 2)
@@ -192,11 +192,11 @@ def constrain(
     sdz = dz.clone()
     if mirror_not_avg:
         if i % 2 == 0:
-            sdz[:, :, :HALF, :] = sdz[:, :, HALF:, :].flip(dims=[2])
+            sdz[:, :, :, :HALF] = sdz[:, :, :, HALF:].flip(dims=[3])
         else:
-            sdz[:, :, HALF:, :] = sdz[:, :, :HALF, :].flip(dims=[2])
+            sdz[:, :, :, HALF:] = sdz[:, :, :, :HALF].flip(dims=[3])
     else:
-        sdz += sdz.flip(dims=[2])
+        sdz += sdz.flip(dims=[3])
         sdz *= .5
     print('encoding...')
     esdz = vae.encode(sdz).latent_dist.mean
