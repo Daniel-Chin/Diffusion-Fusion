@@ -23,7 +23,7 @@ from shared import *
 
 PROMPT = 'a photo of a symmetric bottle on kitchen table'
 WIDTH, HEIGHT = 512, 512
-num_inference_steps = 15
+num_inference_steps = 150
 guidance_scale = 7.5
 N_EXP = 1
 LATENT_FILE = 'latents_constrained_diff.tensor'
@@ -153,7 +153,7 @@ def oneStep(
     text_embeddings,  
 ):
     print('constrain...')
-    latents = constrain(latents, i, True, True, .5)
+    latents = constrain(latents, i, True, True, .1)
 
     # print('expanding...')
     latents_expand = torch.cat([latents] * 2)
