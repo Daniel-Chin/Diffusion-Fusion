@@ -23,7 +23,10 @@ from shared import *
 
 PROMPT = 'a photo of a symmetric bottle on kitchen table'
 WIDTH, HEIGHT = 512, 512
+num_inference_steps = 50
+guidance_scale = 7.5
 N_EXP = 1
+LATENT_FILE = 'latents_constrained_diff.tensor'
 
 generator = torch.Generator(DEVICE_STR).manual_seed(2333)
 tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
@@ -50,10 +53,7 @@ unet = UNet2DConditionModel.from_pretrained(
 ).to(DEVICE)
 print('Loaded models.')
 
-def forward():
-    num_inference_steps = 20
-    guidance_scale = 7.5
-    
+def forward():    
     print('Encoding text...')
     text_input = tokenizer(
         PROMPT, padding="max_length", 
@@ -100,11 +100,11 @@ def forward():
             )
 
     print('Saving...')
-    with open('latents.tensor', 'wb') as f:
+    with open(LATENT_FILE, 'wb') as f:
         torch.save(latents, f)
     
 def visualize():
-    with open('latents.tensor', 'rb') as f:
+    with open(LATENT_FILE, 'rb') as f:
         latents = torch.load(f)
     
     latents = 1 / 0.18215 * latents
@@ -153,7 +153,7 @@ def oneStep(
     text_embeddings,  
 ):
     print('constrain...')
-    latents = constrain(latents)
+    latents = constrain(latents, i, True, False)
 
     # print('expanding...')
     latents_expand = torch.cat([latents] * 2)
@@ -178,12 +178,32 @@ def oneStep(
     # print('step...')
     return scheduler.step(noise_pred, i, latents).prev_sample
 
-def constrain(latents):
-    img = vae.decode(latents)
-    from console import console
-    console({**globals(), **locals()})
-    l_p = vae.encode(img)
-    return latents
+def constrain(
+    z, i: int, mirror_not_avg, do_parallel, 
+    guide_scale=1, 
+):
+    HALF = WIDTH // 2
+    print('decoding...')
+    dz: torch.Tensor = vae.decode(z).sample
+    if do_parallel:
+        print('encoding...')
+        edz = vae.encode(dz).latent_dist.mean
+    print('flipping...')
+    sdz = dz.clone()
+    if mirror_not_avg:
+        if i % 2 == 0:
+            sdz[:, :, :HALF, :] = sdz[:, :, HALF:, :].flip(dims=[2])
+        else:
+            sdz[:, :, HALF:, :] = sdz[:, :, :HALF, :].flip(dims=[2])
+    else:
+        sdz += sdz.flip(dims=[2])
+        sdz *= .5
+    print('encoding...')
+    esdz = vae.encode(sdz).latent_dist.mean
+    if do_parallel:
+        return z + (esdz - edz) * guide_scale
+    else:
+        return esdz
 
 with torch.no_grad():
     forward()
