@@ -14,7 +14,6 @@ from transformers import logging
 from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
 from diffusers import LMSDiscreteScheduler
 import torch
-import numpy as np
 from tqdm import tqdm
 from matplotlib import pyplot as plt
 from winsound import Beep
@@ -25,7 +24,7 @@ from shared import *
 LADDER_LEN = 9
 LADDER = torch.linspace(0, 1, LADDER_LEN)
 
-generator = torch.Generator(DEVICE_STR).manual_seed(2333)
+generator = torch.Generator(DEVICE_STR).manual_seed(23330)
 tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
     "openai/clip-vit-large-patch14", 
 )
@@ -93,6 +92,7 @@ def forward():
         HAS_CUDA or torch.__version__ > '1.12.2'
     ) else nullcontext():
         for i, t in tqdm([*enumerate(scheduler.timesteps)], 'denoising'):
+            print()
             latents = oneStep(
                 i, t, latents, guidance_scale, 
                 uncond_embeddings, text_embeddings_pair,  
@@ -141,6 +141,7 @@ def oneStep(
     i, t, latents, guidance_scale, 
     uncond_embeddings, text_embeddings_pair,  
 ):
+    print('expanding...')
     latents_expand = torch.cat([latents] * 3)
     sigma = scheduler.sigmas[i]
     latents_expand = latents_expand / (
@@ -148,17 +149,21 @@ def oneStep(
     )
 
     # predict the noise residual
+    print('wide text embedding...')
     text_embeddings = torch.cat(
         [uncond_embeddings] * LADDER_LEN + 
         [text_embeddings_pair[0]] * LADDER_LEN + 
         [text_embeddings_pair[1]] * LADDER_LEN
     )
+    print('unet...')
     noise_pred: torch.Tensor = unet(
         latents_expand, t, 
         encoder_hidden_states=text_embeddings, 
     ).sample
+    print('noise_pred.shape:', noise_pred.shape)
 
     # perform guidance
+    print('extract g0 g1...')
     g0 = (
         noise_pred[1 * LADDER_LEN : 2 * LADDER_LEN, :, :, :] - 
         noise_pred[0 * LADDER_LEN : 1 * LADDER_LEN, :, :, :]
@@ -169,9 +174,13 @@ def oneStep(
     )
     # gn = nn - noise_pred_uncond
     # noise_pred = noise_pred_uncond + (g0 + g1 - gn) * guidance_scale
+    print('view envelope...')
     envelope = LADDER.view(LADDER_LEN, 1, 1, 1)
+    print('apply envelope...')
     g = g0 * (1 - envelope) + g1 * envelope
+    print('my scale...')
     my_scale = max(g0.norm(), g1.norm()) / g.norm()
+    print('linear guide...')
     noise_pred = (
         noise_pred[0 * LADDER_LEN : 1 * LADDER_LEN] 
         + g * guidance_scale * my_scale
@@ -183,6 +192,7 @@ def oneStep(
     # )
 
     # compute the previous noisy sample x_t -> x_t-1
+    print('step...')
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 with torch.no_grad():
