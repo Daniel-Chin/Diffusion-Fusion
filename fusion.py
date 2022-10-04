@@ -51,9 +51,12 @@ print('Loaded models.')
 
 def forward():
     prompt_pair = [
-        "a photo of a person doing a handstand on a horse", 
-        "a photo of an astronaut riding a horse on mars", 
-        # "a photo of a horse", 
+        # "a photo of a person doing a handstand on a horse", 
+        # "a photo of an astronaut riding a horse on mars", 
+        # # "a photo of a horse", 
+
+        'a photo of spaceships firing in star wars', 
+        'a photo of a motorbike racing in dense jungles', 
     ]
     num_inference_steps = 20
     guidance_scale = 7.5
