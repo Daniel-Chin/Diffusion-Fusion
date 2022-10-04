@@ -1,10 +1,5 @@
 '''
 Subtracting horse seems useful!?!?
-pixel-level constraints
-    symmetry
-        symmetric dog
-    横看成岭侧成峰
-        computer + music
 '''
 
 from contextlib import nullcontext
@@ -23,18 +18,18 @@ logging.set_verbosity_error()
 from shared import *
 
 PROMPT_PAIR = [
-    "a photo of a person doing a handstand on a horse", 
-    "a photo of an astronaut riding a horse on mars", 
+    # "a photo of a person doing a handstand on a horse", 
+    # "a photo of an astronaut riding a horse on mars", 
     # # "a photo of a horse", 
 
-    # 'a photo of spaceships firing in star wars', 
-    # 'a photo of a motorbike racing in dense jungles', 
+    'a photo of spaceships firing in star wars', 
+    'a photo of a motorbike racing in dense jungles', 
 ]
 LADDER_LEN = 9
 LADDER = torch.linspace(0, 1, LADDER_LEN)
 WIDTH, HEIGHT = 512, 512
 
-generator = torch.Generator(DEVICE_STR).manual_seed(23330)
+generator = torch.Generator(DEVICE_STR).manual_seed(2333)
 tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(
     "openai/clip-vit-large-patch14", 
 )
@@ -226,10 +221,9 @@ def oneStep(
     #     (g0 + g1).norm().item() / 2**.5, 
     # )
 
-    # compute the previous noisy sample x_t -> x_t-1
-    print('step...')
+    # print('step...')
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 with torch.no_grad():
-    # forward()
+    forward()
     visualize()
