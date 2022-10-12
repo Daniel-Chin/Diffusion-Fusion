@@ -153,7 +153,7 @@ def oneStep(
     text_embeddings,  
 ):
     print('constrain...')
-    latents = constrain(latents, i, True, True, .1)
+    latents = constrain(latents, i, True, True, True, .1)
 
     # print('expanding...')
     latents_expand = torch.cat([latents] * 2)
@@ -179,9 +179,17 @@ def oneStep(
     return scheduler.step(noise_pred, i, latents).prev_sample
 
 def constrain(
-    z, i: int, mirror_not_avg, do_parallel, 
+    z, i: int, directly_on_z, mirror_not_avg, do_parallel, 
     guide_scale=1, 
 ):
+    if directly_on_z:
+        z_prime = z.clone()
+        if i % 2 == 0:
+            z_prime[:, :, :, :32] = z[:, :, :, 32:].flip(dims=[3])
+        else:
+            z_prime[:, :, :, 32:] = z[:, :, :, :32].flip(dims=[3])
+        z_prime = guide_scale * z_prime + (1 - guide_scale) * z
+        return z_prime
     HALF = WIDTH // 2
     print('decoding...')
     dz: torch.Tensor = vae.decode(z).sample
